@@ -78,7 +78,7 @@ def claim_article():
                 OR
                 (
                     status = 'processing'
-                    AND processing_started_at < NOW() - INTERVAL '{PROCESSING_TIMEOUT_SECONDS} minutes'
+                    AND processing_started_at < NOW() - INTERVAL '{PROCESSING_TIMEOUT_SECONDS} seconds'
                 )
 
             ORDER BY discovered_at
