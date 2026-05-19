@@ -70,7 +70,6 @@ services:
       timeout: 10s
       retries: 10
 
-
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.4
     container_name: crawler-kibana
@@ -86,8 +85,51 @@ services:
       elasticsearch:
         condition: service_healthy
 
+  neo4j:
+    image: neo4j:5.26
+    container_name: crawler-neo4j
+    restart: unless-stopped
+
+    environment:
+      NEO4J_AUTH: neo4j/neo4j_password
+
+      NEO4J_server_memory_heap_initial__size: 1G
+      NEO4J_server_memory_heap_max__size: 1G
+
+      NEO4J_server_memory_pagecache_size: 1G
+
+      NEO4J_PLUGINS: '["apoc"]'
+
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      NEO4J_apoc_import_file_use__neo4j__config: "true"
+
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+
+    ports:
+      - "7474:7474"   # browser
+      - "7687:7687"   # bolt
+
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_plugins:/plugins
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:7474 || exit 1"
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
 
 volumes:
   postgres_data:
   minio_data:
   elasticsearch_data:
+
+  neo4j_data:
+  neo4j_logs:
+  neo4j_plugins:
