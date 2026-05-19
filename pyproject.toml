@@ -17,4 +17,5 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "sqlalchemy>=2.0.49",
     "underthesea>=9.5.0",
+    "voyageai>=0.3.7",
 ]

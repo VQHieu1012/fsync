@@ -35,10 +35,19 @@ def embed(texts: list[str], model: str = "gemini-embedding-001") -> list[list[fl
     from google import genai
 
     client = genai.Client()
-
     response = client.models.embed_content(model=model, contents=texts)
-
     return list(map(lambda n: n.values, response.embeddings))
+
+
+def embed_voyage(
+    texts: list[str], model: str = "voyage-multilingual-2", input_type: str = "document"
+) -> list[list[float]]:
+    import voyageai
+
+    # VOYAGE_API_KEY
+    client = voyageai.Client()
+    response = client.embed(texts=texts, model=model, input_type=input_type)
+    return response.embeddings
 
 
 def generate_stream(
@@ -58,5 +67,42 @@ def generate_stream(
         model=model, contents=user_message, config=config
     )
 
+    result = ""
     for chunk in stream:
+        result += chunk.text or "" + " "
         print(chunk.text or "", end="", flush=True)
+    return result.strip()
+
+
+def generate_embeddings_voyage(
+    texts: list[str], input_type: str = "query", model: str = "voyage-3"
+) -> list[list[float]]:
+    import voyageai
+
+    client = voyageai.Client()
+
+    response = client.embed(texts=texts, model=model, input_type=input_type)
+
+    return response.embeddings
+
+
+def generate_rerank_stream(
+    query: str, documents: list[str], model: str = "rerank-2", top_k: int = 3
+):
+    import voyageai
+
+    client = voyageai.Client()
+
+    response = client.rerank(query=query, documents=documents, model=model, top_k=top_k)
+
+    results = []
+    for idx, r in enumerate(response.results):
+        doc_text = documents[r.index]
+        score = r.relevance_score
+
+        output = f"\n[Top {idx+1}] Score: {score:.4f} | Text: {doc_text[:100]}...\n"
+        print(output, end="", flush=True)
+
+        results.append({"text": doc_text, "score": score, "index": r.index})
+
+    return results
