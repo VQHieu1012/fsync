@@ -122,7 +122,7 @@ class ElasticSearchClient:
     def get_by_id(self, index_name: str, doc_id: str):
         try:
             response = self.client.get(index=index_name, id=doc_id)
-            return response["_source"]
+            return response
         except Exception as e:
             logging.warning(
                 f"No document ID {doc_id} in index {index_name}. With error: {e}"
@@ -158,3 +158,63 @@ class ElasticSearchClient:
         except Exception as e:
             logging.error(f"Error when searching: {e}")
             return []
+
+    def incremental_scan(
+        self,
+        index_name: str,
+        incremental_column: str,
+        checkpoint_value,
+        batch_size: int = 500,
+        keep_alive: str = "5m",
+    ):
+        """
+        Incremental scan using PIT + search_after.
+        Yield batches instead of single docs.
+        """
+
+        pit_resp = self.client.open_point_in_time(
+            index=index_name, keep_alive=keep_alive
+        )
+
+        pit_id = pit_resp["id"]
+
+        logger.info(f"Opened PIT for index={index_name}")
+
+        search_after = None
+
+        try:
+            while True:
+                body = {
+                    "size": batch_size,
+                    "track_total_hits": False,
+                    "pit": {"id": pit_id, "keep_alive": keep_alive},
+                    "sort": [{incremental_column: "asc"}],
+                    "query": {"range": {incremental_column: {"gt": checkpoint_value}}},
+                }
+
+                if search_after:
+                    body["search_after"] = search_after
+
+                resp = self.client.search(body=body)
+
+                hits = resp["hits"]["hits"]
+
+                if not hits:
+                    logger.info("No more documents.")
+                    break
+
+                yield hits
+
+                search_after = hits[-1]["sort"]
+
+                checkpoint_value = hits[-1]["_source"][incremental_column]
+
+        finally:
+
+            try:
+                self.client.close_point_in_time(body={"id": pit_id})
+
+                logger.info("Closed PIT.")
+
+            except Exception as close_error:
+                logger.warning(f"Failed closing PIT: {close_error}")
